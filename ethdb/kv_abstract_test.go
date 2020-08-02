@@ -27,16 +27,6 @@ func TestManagedTx(t *testing.T) {
 	}()
 
 	bucketID := 0
-	if len(dbutils.DupSortConfig) > 0 {
-		defaultConfig := dbutils.DupSortConfig[0]
-		defer func() {
-			dbutils.DupSortConfig[0] = defaultConfig
-		}()
-
-		dbutils.DupSortConfig[0].ToLen = 4
-		dbutils.DupSortConfig[0].FromLen = 6
-		bucketID = dbutils.DupSortConfig[0].ID
-	}
 	bucket1 := dbutils.Buckets[bucketID]
 	bucket2 := dbutils.Buckets[bucketID+1]
 	dbutils.BucketsCfg[string(bucket1)].IsDupsort = true

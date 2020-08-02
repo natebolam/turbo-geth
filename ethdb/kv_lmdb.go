@@ -16,7 +16,7 @@ import (
 	"github.com/ledgerwatch/turbo-geth/log"
 )
 
-const LMDBMapSize = 2 * 1024 * 1024 * 1024 * 1024 // 2TB
+const LMDBMapSize = 256 * 1024 * 1024 * 1024 // 2TB
 
 type lmdbOpts struct {
 	path     string
@@ -170,7 +170,6 @@ func (db *LmdbKV) Close() {
 	if db.lmdbTxPool != nil {
 		db.lmdbTxPool.Close()
 	}
-
 	if db.env != nil {
 		db.wg.Wait()
 	}
@@ -295,18 +294,7 @@ func (tx *lmdbTx) Bucket(name []byte) Bucket {
 		panic(fmt.Errorf("unknown bucket: %s. add it to dbutils.Buckets", string(name)))
 	}
 
-	b := &lmdbBucket{tx: tx, id: cfg.ID, dbi: tx.db.buckets[cfg.ID], isDupsort: cfg.IsDupsort, dupFrom: cfg.DupFromLen, dupTo: cfg.DupToLen}
-	for _, c := range dbutils.DupSortConfig {
-		if c.ID != id {
-			continue
-		}
-		b.isDupsort = true
-		b.dupTo = c.ToLen
-		b.dupFrom = c.FromLen
-		break
-	}
-
-	return b
+	return &lmdbBucket{tx: tx, id: cfg.ID, dbi: tx.db.buckets[cfg.ID], isDupsort: cfg.IsDupsort, dupFrom: cfg.DupFromLen, dupTo: cfg.DupToLen}
 }
 
 func (tx *lmdbTx) Commit(ctx context.Context) error {
@@ -360,10 +348,6 @@ func (c *LmdbCursor) NoValues() NoValuesCursor {
 }
 
 func (b lmdbBucket) Get(key []byte) ([]byte, error) {
-	if b.isDupsort {
-		return b.getDupSort(key)
-	}
-
 	if b.isDupsort {
 		return b.getDupSort(key)
 	}
@@ -633,30 +617,6 @@ func (c *LmdbCursor) Delete(key []byte) error {
 			return nil
 		}
 		return err
-	}
-
-	return c.cursor.Del(0)
-}
-
-func (c *LmdbCursor) deleteDupSort(key []byte) error {
-	b := c.bucket
-	if len(key) != b.dupFrom && len(key) >= b.dupTo {
-		return fmt.Errorf("dupsort bucket: %s, can have keys of len==%d and len<%d. key: %x", dbutils.Buckets[b.id], b.dupFrom, b.dupTo, key)
-	}
-
-	if len(key) == b.dupFrom {
-		b := c.bucket
-		_, v, err := c.cursor.Get(key[:b.dupTo], key[b.dupTo:], lmdb.GetBothRange)
-		if err != nil { // if key not found, or found another one - then nothing to delete
-			if lmdb.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		if !bytes.Equal(v[:b.dupFrom-b.dupTo], key[b.dupTo:]) {
-			return nil
-		}
-		return c.cursor.Del(0)
 	}
 
 	return c.cursor.Del(0)

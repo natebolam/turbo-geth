@@ -175,8 +175,9 @@ func (db *ObjectDatabase) Get(bucket, key []byte) (dat []byte, err error) {
 	err = db.kv.View(context.Background(), func(tx Tx) error {
 		v, _ := tx.Bucket(bucket).Get(key)
 		if v != nil {
-			dat = make([]byte, len(v))
-			copy(dat, v)
+			dat = v
+			//dat = make([]byte, len(v))
+			//copy(dat, v)
 		}
 		return nil
 	})
