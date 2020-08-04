@@ -89,25 +89,10 @@ func (opts lmdbOpts) Open() (KV, error) {
 		buckets: map[string]lmdb.DBI{},
 	}
 
-	if opts.readOnly {
-		if err := env.View(func(tx *lmdb.Txn) error {
-			for _, name := range dbutils.Buckets {
-				dbi, createErr := tx.OpenDBI(string(name), 0)
-				if createErr != nil {
-					return createErr
-				}
-				db.buckets[string(name)] = dbi
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := db.CreateBuckets(dbutils.Buckets...); err != nil {
-			return nil, err
-		}
-		// don't create deprecated buckets
+	if err := db.CreateBuckets(dbutils.Buckets...); err != nil {
+		return nil, err
 	}
+	// don't create deprecated buckets
 
 	if err := env.View(func(tx *lmdb.Txn) error {
 		for _, name := range dbutils.DeprecatedBuckets {
@@ -171,7 +156,11 @@ func (db *LmdbKV) CreateBuckets(buckets ...[]byte) error {
 			continue
 		}
 
-		var flags uint = lmdb.Create
+		var flags uint = 0
+
+		if !db.opts.readOnly {
+			flags |= lmdb.Create
+		}
 		if cfg.IsDupsort {
 			flags |= lmdb.DupSort
 		}
